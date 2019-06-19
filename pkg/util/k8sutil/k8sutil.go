@@ -254,7 +254,9 @@ func AddEtcdVolumeToPod(pod *v1.Pod, pvc *v1.PersistentVolumeClaim) {
 			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name},
 		}
 	} else {
-		vol.VolumeSource = v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}
+                // Use emptydir with "Medium: memory" to use tmpfs storage.
+                // See: https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
+		vol.VolumeSource = v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory"}}
 	}
 	pod.Spec.Volumes = append(pod.Spec.Volumes, vol)
 }
@@ -298,8 +300,9 @@ func NewEtcdPodPVC(m *etcdutil.Member, pvcSpec v1.PersistentVolumeClaimSpec, clu
 }
 
 func newEtcdPod(m *etcdutil.Member, initialCluster []string, clusterName, state, token string, cs api.ClusterSpec) *v1.Pod {
+        // Add in https on port 2378 for our application.
 	commands := fmt.Sprintf("/usr/local/bin/etcd --data-dir=%s --name=%s --initial-advertise-peer-urls=%s "+
-		"--listen-peer-urls=%s --listen-client-urls=%s --advertise-client-urls=%s "+
+		"--listen-peer-urls=%s --listen-client-urls=%s,https://0.0.0.0:2378 --advertise-client-urls=%s "+
 		"--initial-cluster=%s --initial-cluster-state=%s",
 		dataDir, m.Name, m.PeerURL(), m.ListenPeerURL(), m.ListenClientURL(), m.ClientURL(), strings.Join(initialCluster, ","), state)
 	if m.SecurePeer {
